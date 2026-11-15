@@ -2,7 +2,18 @@
 
 'use client';
 
-import { Cat, Clover, Film, Home, Menu, Radio, Search, Star, Tv } from 'lucide-react';
+import {
+  CalendarDays,
+  Cat,
+  Clover,
+  Film,
+  Home,
+  Menu,
+  Radio,
+  Search,
+  Star,
+  Tv,
+} from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -125,6 +136,11 @@ const Sidebar = ({ onToggle, activePath = '/' }: SidebarProps) => {
   };
 
   const [menuItems, setMenuItems] = useState([
+    {
+      icon: CalendarDays,
+      label: '更新',
+      href: '/updates',
+    },
     {
       icon: Film,
       label: '电影',
