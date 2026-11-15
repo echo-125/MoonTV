@@ -2,7 +2,8 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
+    # dev 是本 fork 的默认分支（上游同步落在 dev），加进来才有 lint/typecheck/test 门禁
+    branches: [main, master, dev]
   pull_request:
     branches: [main, master]
 
