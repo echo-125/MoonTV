@@ -153,6 +153,16 @@ jobs:
           docker buildx imagetools create -t ghcr.io/echo-125/moontv:${{ steps.docker-tag.outputs.tag }} \
             $(printf 'ghcr.io/echo-125/moontv@sha256:%s ' *)
 
+      # 额外打一个 latest：只有"部署分支"（dev / main / master）才配拥有它，
+      # 这样手动 dispatch 出来的 try-xxx 之类的临时标签不会污染 latest。
+      # 云端的 compose 就固定拉 :latest。
+      - name: Also tag as latest for the deployment branch
+        if: github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        working-directory: /tmp/digests
+        run: |
+          docker buildx imagetools create -t ghcr.io/echo-125/moontv:latest \
+            $(printf 'ghcr.io/echo-125/moontv@sha256:%s ' *)
+
   cleanup-refresh:
     runs-on: ubuntu-latest
     needs:
