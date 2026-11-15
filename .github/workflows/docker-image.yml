@@ -9,7 +9,7 @@ on:
         default: 'latest'
         type: string
   push:
-    branches: [ main, master ]
+    branches: [ main, master, dev ]
   pull_request:
     branches: [ main, master ]
   release:
@@ -45,8 +45,13 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "release" ]; then
             echo "tag=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+          elif [ -n "${{ github.event.inputs.tag }}" ]; then
+            echo "tag=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.ref }}" = "refs/heads/main" ] || [ "${{ github.ref }}" = "refs/heads/master" ]; then
+            echo "tag=latest" >> "$GITHUB_OUTPUT"
           else
-            echo "tag=${{ github.event.inputs.tag || 'latest' }}" >> "$GITHUB_OUTPUT"
+            # 非默认分支（如 dev）产出自己的标签，不覆盖 latest
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Checkout source code
@@ -71,7 +76,7 @@ jobs:
         uses: docker/metadata-action@v5
 
         with:
-          images: ghcr.io/moontechlab/lunatv
+          images: ghcr.io/echo-125/moontv
           tags: |
             type=raw,value=${{ github.event.inputs.tag || 'latest' }},enable={{is_default_branch}}
             type=semver,pattern={{version}},enable=${{ github.event_name == 'release' }}
@@ -85,8 +90,8 @@ jobs:
           file: ./Dockerfile
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
-          tags: ghcr.io/moontechlab/lunatv:${{ steps.docker-tag.outputs.tag }}
-          outputs: type=image,name=ghcr.io/moontechlab/lunatv,name-canonical=true,push=true
+          tags: ghcr.io/echo-125/moontv:${{ steps.docker-tag.outputs.tag }}
+          outputs: type=image,name=ghcr.io/echo-125/moontv,name-canonical=true,push=true
 
       - name: Export digest
         run: |
@@ -133,15 +138,20 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "release" ]; then
             echo "tag=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+          elif [ -n "${{ github.event.inputs.tag }}" ]; then
+            echo "tag=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.ref }}" = "refs/heads/main" ] || [ "${{ github.ref }}" = "refs/heads/master" ]; then
+            echo "tag=latest" >> "$GITHUB_OUTPUT"
           else
-            echo "tag=${{ github.event.inputs.tag || 'latest' }}" >> "$GITHUB_OUTPUT"
+            # 非默认分支（如 dev）产出自己的标签，不覆盖 latest
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Create manifest list and push
         working-directory: /tmp/digests
         run: |
-          docker buildx imagetools create -t ghcr.io/moontechlab/lunatv:${{ steps.docker-tag.outputs.tag }} \
-            $(printf 'ghcr.io/moontechlab/lunatv@sha256:%s ' *)
+          docker buildx imagetools create -t ghcr.io/echo-125/moontv:${{ steps.docker-tag.outputs.tag }} \
+            $(printf 'ghcr.io/echo-125/moontv@sha256:%s ' *)
 
   cleanup-refresh:
     runs-on: ubuntu-latest
