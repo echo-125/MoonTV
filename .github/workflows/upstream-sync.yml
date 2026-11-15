@@ -63,8 +63,8 @@ jobs:
       - name: Setup pnpm
         if: steps.behind.outputs.count != '0'
         uses: pnpm/action-setup@v4
-        with:
-          version: 10
+        # 不写 version：写了会和 package.json 的 packageManager (pnpm@10.14.0) 冲突
+
 
       - name: Setup Node
         if: steps.behind.outputs.count != '0'
