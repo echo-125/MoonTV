@@ -1,0 +1,112 @@
+name: Sync upstream
+
+# 每天自动把 MoonTechLab/LunaTV 的新提交合并进本 fork 的 dev 分支。
+#
+# 设计取舍：
+#   - 只在 dev 上做，不碰 main（main 保持与 upstream/main 一致，方便随时对照）
+#   - 合并后必须 lint / typecheck / test / build 全过才 push；任一失败就整个作废，
+#     dev 一个字节都不动 —— 宁可不同步，也不要让云端拉到跑不起来的镜像
+#   - 合并冲突时 workflow 直接失败（不会半途 push），需要人/agent 在本地解决
+#   - 定时任务在 fork 上默认可被 GitHub 停用（仓库 60 天无活动），
+#     所以保留 workflow_dispatch，随时可手动触发一次
+on:
+  schedule:
+    # UTC 20:30 = 北京时间 04:30，避开白天
+    - cron: '30 20 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: upstream-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    name: Merge upstream/main into dev
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout dev
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+          # 需要完整历史才能做真正的 merge，而不是浅克隆
+          fetch-depth: 0
+
+      - name: Add upstream remote
+        run: |
+          git remote add upstream https://github.com/MoonTechLab/LunaTV.git
+          git fetch upstream --tags
+
+      - name: Check how far behind
+        id: behind
+        run: |
+          count=$(git rev-list --count HEAD..upstream/main)
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          echo "dev 落后 upstream/main $count 个提交"
+
+      - name: Nothing to do
+        if: steps.behind.outputs.count == '0'
+        run: echo "已是最新，跳过。"
+
+      - name: Merge upstream
+        if: steps.behind.outputs.count != '0'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # 不用 --strategy-option=theirs：冲突就该停下来让人看，
+          # 无脑偏向任一边都会静默丢掉某方的修复
+          git merge upstream/main --no-edit
+
+      - name: Setup pnpm
+        if: steps.behind.outputs.count != '0'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node
+        if: steps.behind.outputs.count != '0'
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        if: steps.behind.outputs.count != '0'
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        if: steps.behind.outputs.count != '0'
+        run: pnpm lint:strict
+
+      - name: Typecheck
+        if: steps.behind.outputs.count != '0'
+        run: pnpm typecheck
+
+      - name: Test
+        if: steps.behind.outputs.count != '0'
+        run: pnpm test
+
+      - name: Build
+        if: steps.behind.outputs.count != '0'
+        run: pnpm build
+        env:
+          # 构建期必须是 localstorage：设成 redis/kvrocks 会让 `Collecting page data`
+          # 真去连 Redis，连不上就直接构建失败（见 docs/deploy-cloud.md 结论二）
+          NEXT_PUBLIC_STORAGE_TYPE: localstorage
+
+      - name: Push result
+        if: steps.behind.outputs.count != '0'
+        run: git push origin HEAD:dev
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### 上游同步结果"
+            echo ""
+            echo "- 落后提交数：${{ steps.behind.outputs.count }}"
+            echo "- 结果：${{ job.status }}"
+          } >> "$GITHUB_STEP_SUMMARY"
