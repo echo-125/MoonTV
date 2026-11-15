@@ -1,2 +1,25 @@
 .env
 .env*.local
+
+# 构建上下文不需要依赖与产物：Dockerfile 的 deps 阶段会重新 pnpm install
+# （把宿主机的 node_modules 带进上下文不只是慢 516MB，还会把
+#  @next+swc-win32-x64-msvc 这类平台专用二进制覆盖到 Linux builder 上）
+node_modules
+.pnpm-store
+
+# 构建产物与缓存
+.next
+out
+dist
+.swc
+tsconfig.tsbuildinfo
+
+# 版本库与 CI 元数据
+.git
+.gitignore
+.github
+
+# 本地临时产物
+tmp
+coverage
+*.log
